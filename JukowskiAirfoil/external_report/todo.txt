@@ -1,0 +1,12 @@
+Things to be done with the external report:
+- Write the abstract.
+- Proper title.
+- Find references.
+- Finish the analysis of convergence of the force on the circle. Do the same with the derivative of the force.
+- Decide whether it is good to have so large pictures for flow fields. If they are on separate pages they could be even larger.
+- Lager font size for Lift-Drag versus angle plot (file lift_drag.pdf).
+- Proper title.
+- Acknowledgements.
+- Write about the eigenvalues. Large real values: real things. Small real values (large negative): numerical things.
+
+- Possibly other things (header? etc.)

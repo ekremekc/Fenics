@@ -1,0 +1,103 @@
+\documentclass[12pt, a4paper]{article}
+
+\begin{document}
+    \title{Using the code for optimising airfoils}
+    \day 01
+    \month 09
+    \year 2017
+    \author{Botond Oreg, bzo20@cam.ac.uk}
+    \maketitle
+    \section{Different airfoils}
+        \subsection{General properties of the airfoil classes}
+            These classes contain the information about the geometry of the domain. Most importantly the mesh is made upon initialising these classes. \\
+            A proper airfoil should have the following initialising arguments:
+            \begin{itemize}
+                \item \texttt{resolution}: The number of points on the airfoil. Increasing this number makes the mesh finer as well. It probably shouldn't be lower than $50$ and computational time becomes quite large above $300$.
+                \item \texttt{outerGeometry}: The properties of the outer bounding box of the airfoil at the centre. It is a dictionary with the following entries:
+                \begin{itemize}
+                    \item \texttt{"xFrontLength"}: The distance between the centre and the inflow boundary.
+                    \item \texttt{"yHalfLength"}: The distance between the centre and the bottom and top boundaries.
+                    \item \texttt{"xBackLength"}: The distance between the centre and the outflow boundary.
+                \end{itemize}
+                All three of these distances are positive.
+                \item \texttt{airfoilParameters}: The list parameters describing the airfoil. It should be always a list even if there is just one parameter.
+            \end{itemize}
+            After initialisation the airfoil should have the following fields:
+            \begin{itemize}
+                \item \texttt{mesh}: The mesh of the domain. It is probably the most important field because it s called every time a function space is declared.
+                \item \texttt{dim}: The 'dimension' of the airfoil i.e. the number of its parameters. The list airfoilParameters should have dim number of elements.
+                \item \texttt{area}: The area of the airfoil.
+                \item \texttt{airfoilPoints}: The list of (x,y) coordinate tuples of airfoil coordinate points.
+                \item \texttt{deltax}: The width of the airfoil in the x direction. That is the difference between the x coordinates of the rightmost point and the leftmost point.
+                \item \texttt{deltay}: The thickness of the airfoil in the y direction. That is the difference between the y coordinates of the uppermost point and the lowermost point.
+                \item \texttt{dSurf}: The object one can use to integrate on a specific boundary. For example to integrate on the airfoil only multiply the function with \texttt{dSurf(1)} instead of \texttt{dolfin.ds}. The surfaces are marked as:
+                \begin{itemize}
+                    \item \textit{1}: Airfoil boundary.
+                    \item \textit{2}: Left or inflow boundary.
+                    \item \textit{3}: Bottom and top or wall boundary.
+                    \item \textit{4}: Right or outflow boundary.
+                \end{itemize}
+                \item \texttt{n}: The surface normal on the boundaries pointing outwards.
+            \end{itemize}
+            An airfoil should have the following callable methods:
+            \begin{itemize}
+                \item \texttt{leftBoundary(x, on\textunderscore boundary)}: Returns True if x is on the inflow boundary.
+                \item \texttt{rightBoundary(x, on\textunderscore boundary)}: Returns True if x is on the outflow boundary.
+                \item \texttt{bottomTopBoundary(x, on\textunderscore boundary)}: Returns True if x is on the wall boundary.
+                \item \texttt{airfoilBoundary(x, on\textunderscore boundary)}: Returns True if x is on the airfoil boundary.
+                \item \texttt{surfaceDeformation(paramID)}: Returns the $\mathbf{V}$ deformation vector space on the surface of the airfoil with respect to changes of paramID\textsuperscript{th} parameter of the airfoil.
+                \item \texttt{areaDerivative()}: Returns a list of the derivatives of the area with respect to the airfoil parameters. The i\textsuperscript{th} element of the list is the derivative of the airfoil area with respect to the i\textsuperscript{th} parameter.
+            \end{itemize}
+        \subsection{CircleAirfoil.py}
+            A circular obstacle. It has one parameter its radius (dim = 1).
+        \subsection{JoukowskyAirfoil.py}
+            A Joukowsky-like airfoil. It has three parameters (dim = 3). These are the real and imaginary parts of the parameter $c$ and an angle of rotation (in radians, to the positive direction). The first parameter needs to be smaller than $0.025$ otherwise the airfoil becomes overlapping (like an $\infty$ shape).
+        \subsection{GivenAirfoil.py}
+            This is a special type of parameter free airfoil which is defined by its surface points. For this airfoil the third initialising argument (which would normally be \texttt{airfoilParameters}) is a list of the (x,y) coordinates of the airfoil points. For this airfoil dim = 0. The functions \texttt{surfaceDeformation()} and \texttt{areaDerivative()} are not implemented for this airfoil as it is parameter free. At the moment it is best to use it only for calculating the flow around it. In the future this airfoil might be used for parameter free optimisation.
+    \section{FlowAroundAirfoil.py}
+        This class contains everything about the flow fields. \\
+        The initialising arguments are:
+        \begin{itemize}
+            \item \texttt{airfoil}: An initialised airfoil object.
+            \item \texttt{v\textunderscore in}: The $v_{in}$ inflow velocity.
+            \item \texttt{mu}: The $\mu$ dynamic viscosity.
+            \item \texttt{rho}: The $\rho$ density of the fluid.
+        \end{itemize}
+        The class has the following fields:
+        \begin{itemize}
+            \item \texttt{uFull}: The complete flow. Its first two dimensions are the x and y components of the $\mathbf{u}$ velocity field and its third component is the $p$ pressure field.
+            \item \texttt{u\textunderscore x, u\textunderscore y}: The x and y components of the $\mathbf{u}$ velocity.
+            \item \texttt{u}: The $\mathbf{u}$ velocity vector field.
+            \item \texttt{p}: The $p$ pressure field.
+            \item \texttt{eigenvalues}: A list of eigenvalues. \texttt{eigenvalues[i]} is the tuple (sReal, sImag) the real and imaginary parts of the eigenvalue. The field exists only if either \texttt{findEigenvalues()} or \texttt{getMaxEigenvalue()} was called beforehand.
+            \item \texttt{eigenflows}: A list of eigenflows. \texttt{eigenflows[i]} is the tuple (wRealFull, wImagFull) the real and imaginary parts of the complete eigenflows. For both functions the first two components are the x and y components of velocity fields and the third component is the pressure field. The field exists only if either \texttt{findEigenvalues()} or \texttt{getMaxEigenvalue()} was called beforehand.
+        \end{itemize}
+        The class has the following callable functions:
+        \begin{itemize}
+            \item \texttt{saveSolution((uFile,pFile), label=None)}: Save the calculated $(\mathbf{u}, p)$ flow field into the given files \texttt{uFile} (for velocity) and \texttt{pFile} (for pressure). If label is specified then the given label is added to the saved flow fields. It can be time, frame number etc. The given label needs to be convertible to a float.
+            \item \texttt{dragForceDirect(directionVector)}: The component of the force on the airfoil pointing towards \texttt{directionVector}. It is assumed that \texttt{directionVector} has unit length. The force component is calculated directly by integrating on the airfoil boundary. It is better to use the function \texttt{dragForceGauss()} as that produces good results even for lower resolutions. It is kept mainly to be able to compare the two methods.
+            \item \texttt{dragForceGauss(directionVector)}: The component of the force on the airfoil pointing towards \texttt{directionVector}. It is assumed that \texttt{directionVector} has unit length. The force component is calculated as a volume integral using Gauss' law. For example \texttt{dragForceGauss((1,0))} gives the (x directional) drag force on the airfoil and \texttt{dragForceGauss((0,1))} gives the (y directional) lift force.
+            \item \texttt{forceDerivative(directionVector)}: A list of the derivatives of the component of the force on the airfoil pointing towards \texttt{directionVector}. It is assumed that \texttt{directionVector} has unit length. The i\textsuperscript{th} element of the list is the derivative of the force component with respect to the i\textsuperscript{th} shape parameter.
+            \item \texttt{costLD()}: The Lift-Drag ratio.
+            \item \texttt{costLDDerivative()}: The derivative of the Lift-Drag ratio. A list is returned and its i\textsuperscript{th} component is the derivative of the Lift-Drag ratio with respect to the i\textsuperscript{th} parameter.
+            \item \texttt{findEigenvalues(nEigenvalues=60)}: Find the first \texttt{nEigenvalues} number of eigenvalues ordered by magnitude. This number should probably be increased as the most unstable mode (which one usually seeks to find) is sometimes found only when \texttt{nEigenvalues} is larger. The function creates the fields \texttt{eigenvalues} and \texttt{eigenflows}.
+            \item \texttt{getMaxEigenvalue(nonZeroFreq=False, nEigenvalues=60)}: Find the most unstable eigenvalue i.e. the one with the largest real part. The tuple \texttt{(maxSReal, maxSImag), maxSIndex} is returned where \texttt{maxSReal} and \texttt{maxSImag} are the real and imaginary parts of the most unstable eigenvalue and \texttt{maxSIndex} is the index of the eigenvalue. It is true that \texttt{eigenvalues[maxSIndex] = (maxSReal, maxSImag)}. If nonZeroFreq is True than the searched eigenvalue has positive imaginary part. The maximum eigenvalue is searched among the first \texttt{nEigenvalues} number of eigenvalues ordered by magnitude. The function creates the fields \texttt{eigenvalues} and \texttt{eigenflows}.
+            \item \texttt{eigenvalueDerivative(eigenIndex=None)}: Find the derivative of an eigenvalue. If \texttt{eigenIndex} is specified then the derivative of the eigenvalue of that index is searched if not than the derivative of the found most unstable eigenvalue is searched. The tuple \texttt{(sRealDer, sImagDer)} is returned where both \texttt{sRealDer} and \texttt{sImagDer} are list of the derivatives of the real and imaginary parts. Their i\textsuperscript{th} element is the derivative with respect to the i\textsuperscript{th} parameter.
+        \end{itemize}
+        There is another function \texttt{costFunctionHessian(stepSize)} which is not working currently. It originally calculated the Hessian matrix of \texttt{costLD} with respect to shape parameter changes.
+    \section{Scripts using the code}
+        The following scripts illustrate how to use the programs.
+        \subsection{flow\textunderscore stab.py}
+            The script optimises the airfoil. It first optimises to minimal drag with the area kept constant. Then the Lift-Drag ratio is maximised with the area kept constant. Then the angle of attack is changed until the flow becomes stable enough. Then the Lift-Drag ratio is maximised while keeping the area and the real part of the most unstable eigenmode constant. The flow is saved during every step and the important parameters are written out into a file.
+        \subsection{methods.py}
+            This script has three methods which can be useful.
+            \begin{itemize}
+                \item \texttt{shapeTransform(originalShape, finalShape, nFrames=150)}: \texttt{originalShape} is a list of (x,y) coordinates of the original airfoil and \texttt{finalShape} is a similar list of the final airfoil. The function gives a list of list of coordinates. These coordinate lists correspond to a frame during the transformation of the original shape to the final shape. The function might be used upon animating the transformation of one airfoil to the other.
+                \item \texttt{constrainedStep(costDer, constraintDer, constraintVal, stepSize, maximise=True)}: Calculating the step in multidimensional space towards the maximum of a function (or the minimum if \texttt{maximise=False}) with one constraint. The constraint is that for a function $f = 0$. \texttt{costDer} is the gradient of the cost function, \texttt{constraintDer} is the gradient of the constraint function $f$. \texttt{constraintVal} is the value of the function at the current point. This is not necessarily zero (but it is usually small) and the step is calculated to make the necessary corrections. \texttt{stepSize} gives how large step should be taken. If \texttt{maximise} is True then the step towards the maximum value is calculated otherwise the step towards the minimum value is calculated.
+                \item \texttt{twoConstrainedStep(costDer, constraintDer\textunderscore 1, constraintVal\textunderscore 1, constraintDer\textunderscore 2, constraintVal\textunderscore 2, stepSize, maximise=True)}: Similar to \texttt{constrainedStep} but with two constraints.
+            \end{itemize}
+        \subsection{plot\textunderscore flow.py}
+            This script varies the angle of the airfoil and finds the eigenvalues of the flow. It writes out the real and imaginary parts of each eigenvalue at each angle of incidence. At the end of the file it writes out the most unstable eigenvalues at each angle of incidence separately.
+        \subsection{plot\textunderscore perturbation.py}
+            This script calculated the frames of a video. The base flow is first calculated and shown for $1.5 \, sec$. Then the most unstable mode is added to the base flow and shown for $10 \, sec$. With the original input arguments the perturbation should be at the edge of stability and the amplitude is not changed. Then the angle of attack is reduced and the flow is stabilised. It is shown how the perturbation dies away for another $30 \, sec$.
+\end{document}
